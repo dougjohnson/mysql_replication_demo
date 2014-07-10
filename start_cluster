@@ -1,0 +1,95 @@
+#!/bin/bash -e
+
+master_port=3306
+
+trap "tput sgr0" EXIT
+
+function usage() {
+    echo "Usage: $0 OPTION VALUE"
+    echo ""
+    echo "Downloads and starts a replicating cluster of mysql instances for testing purposes."
+    echo "A cluster comprises of a single master and a configurable number of slaves."
+    echo ""
+    echo "Long live docker!"
+    echo "http://www.docker.com/"
+    echo ""
+    echo "Options:"
+    echo "  -n  the number of slave instances to create (min 1)"
+    echo "" 
+    exit 1
+}
+
+num_slaves=false
+while getopts ":n:" opt; do
+  case $opt in
+    n)
+      num_slaves=$OPTARG
+      ;;
+    \?)
+      echo -e '\x1B[1;31m'
+      echo "Invalid option: -$OPTARG" >&2
+      usage
+      ;;
+    :)
+      echo -e '\x1B[1;31m'
+      echo "Option -$OPTARG requires an argument." >&2
+      usage
+      ;;
+  esac
+done
+
+if ! [[ $num_slaves =~ ^-?[0-9]+$ ]]
+then
+  echo -e '\x1B[1;31m'
+  usage
+fi
+
+if ! docker ps > /dev/null 2>&1
+then 
+  echo -e '\x1B[1;31m'
+  echo "Docker needs to be installed and running." >&2
+  echo "Try:"
+  echo "  sudo apt-get install docker-io"
+  echo "  or"
+  echo "  sudo yum install docker-io"
+  echo ""
+  echo "See https://docs.docker.com/installation"
+  echo ""
+  exit 1
+fi
+
+function start_slave() {
+  echo "starting slave ${1} on port ${2}"
+  docker run -d -p ${2}:3306 --link master:master --name slave${1} doug/mysql-slave --server-id=${1}
+  output+="mysql -uroot -proot -h 127.0.0.1 -P ${2} -e \"select * from cluster_test.pets\"\n"
+  return $?
+}
+
+function start_master() {
+  echo "starting master on port $master_port"
+  docker run -d -p $master_port:3306 --name master doug/mysql-master
+  return $?
+}
+
+output+="##############################################\n"
+output+="\n"
+output+="Your replicating cluster is ready to go!\n"
+output+="Connect to it on 127.0.0.1\n"
+output+="\n"
+output+="Issue the following commands to test it:\n"
+output+="\n"
+output+="mysql -uroot -proot -h 127.0.0.1 -P 3306 -e \"create database cluster_test;\"\n"
+output+="mysql -uroot -proot -h 127.0.0.1 -P 3306 -e \"create table cluster_test.pets(name varchar(25));\"\n"
+output+="mysql -uroot -proot -h 127.0.0.1 -P 3306 -e \"insert into cluster_test.pets values('fido');\"\n"
+
+start_master
+
+for (( i=1; i<=$num_slaves; i++ ))
+do
+  let slave_port=$master_port+$i
+  start_slave $i $slave_port
+done
+
+output+="mysql -uroot -proot -h 127.0.0.1 -P 3306 -e \"drop database cluster_test;\"\n\n"
+output+="##############################################"
+echo -e '\x1B[1;36m'"${output}"
