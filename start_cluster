@@ -40,7 +40,6 @@ done
 if ! [[ $num_slaves =~ ^-?[0-9]+$ ]]
 then
   echo -e '\x1B[1;31m'
-  echo "Option -n requires a number as an argument." >&2
   usage
 fi
 
