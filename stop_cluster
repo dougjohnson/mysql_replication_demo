@@ -1,0 +1,92 @@
+#!/bin/bash -e
+
+master_port=3306
+
+trap "tput sgr0" EXIT
+
+function usage() {
+    echo "Usage: $0 -n <slavecount>"
+    echo ""
+    echo "Stops the running cluster"
+    echo ""
+    echo "Options:"
+    echo "  -n  the number of slave instances to create (min 1)"
+    echo "" 
+    exit 1
+}
+
+while getopts ":n:" opt; do
+  case $opt in
+    n)
+      num_slaves=$OPTARG
+      ;;
+    \?)
+      echo -e '\x1B[1;31m'
+      echo "Invalid option: -$OPTARG" >&2
+      usage
+      ;;
+    :)
+      echo -e '\x1B[1;31m'
+      echo "Option -$OPTARG requires an argument." >&2
+      usage
+      ;;
+  esac
+done
+
+if ! [[ $num_slaves =~ ^-?[0-9]+$ ]]
+then
+  echo -e '\x1B[1;31m'
+  usage
+fi
+
+if ! docker ps > /dev/null 2>&1
+then 
+  echo -e '\x1B[1;31m'
+  echo "Docker needs to be installed and running." >&2
+  echo "Try:"
+  echo "  sudo apt-get install docker-io"
+  echo "  or"
+  echo "  sudo yum install docker-io"
+  echo ""
+  echo "See https://docs.docker.com/installation"
+  echo ""
+  exit 1
+fi
+
+function pause_slave() {
+  echo "pausing slave ${1}"
+  docker stop slave${1}
+  return $?
+}
+
+function pause_master() {
+  echo "pausing master"
+  docker stop master
+  return $?
+}
+
+function stop_slave() {
+  echo "stopping slave ${1}"
+  docker rm -f slave${1}
+  return $?
+}
+
+function stop_master() {
+  echo "stopping master"
+  docker rm -f master
+  return $?
+}
+
+pause_master
+for (( i=1; i<=$num_slaves; i++ ))
+do
+  pause_slave $i
+done
+
+stop_master
+
+for (( i=1; i<=$num_slaves; i++ ))
+do
+  stop_slave $i
+done
+echo -e '\x1B[1;36m'"${output}"
