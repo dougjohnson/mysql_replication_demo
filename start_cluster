@@ -63,7 +63,8 @@ function start_slave() {
   echo "starting slave ${1} on port ${2}"
   docker run -d -p ${2}:3306 --link master:master --name slave${1} doug/mysql-slave --server-id=${1}
   slaveip=`docker inspect --format='{{.NetworkSettings.IPAddress}}' slave${1}`
-  slave_output+="${dockermysql} -uroot -proot -h ${slaveip} -e \"select * from cluster_test.pets\"\n"
+  slave_output_host+="mysql -uroot -proot -h 127.0.0.1 -P ${2} -e \"select * from cluster_test.pets\"\n"
+  slave_output_docker+="${dockermysql} -uroot -proot -h ${slaveip} -e \"select * from cluster_test.pets\"\n"
   return $?
 }
 
@@ -86,14 +87,20 @@ done
 output+="##############################################\n"
 output+="\n"
 output+="Your replicating cluster is ready to go!\n"
-output+="Connect to it on ${masterip}\n"
+output+="Connect to it on 127.0.0.1 if you're running docker locally\n"
 output+="\n"
 output+="Issue the following commands to test it:\n"
 output+="\n"
+output+="mysql -uroot -proot -h 127.0.0.1 -P 3306 -e \"create database cluster_test;\"\n"
+output+="mysql -uroot -proot -h 127.0.0.1 -P 3306 -e \"create table cluster_test.pets(name varchar(25));\"\n"
+output+="mysql -uroot -proot -h 127.0.0.1 -P 3306 -e \"insert into cluster_test.pets values('fido');\"\n"
+output+="$slave_output_host"
+output+="mysql -uroot -proot -h 127.0.0.1 -P 3306 -e \"drop database cluster_test;\"\n\n"
+output+="Or connect to it from within another container:\n"
 output+="${dockermysql} -uroot -proot -h ${masterip} -e \"create database cluster_test;\"\n"
 output+="${dockermysql} -uroot -proot -h ${masterip} -e \"create table cluster_test.pets(name varchar(25));\"\n"
 output+="${dockermysql} -uroot -proot -h ${masterip} -e \"insert into cluster_test.pets values('fido');\"\n"
-output+="$slave_output"
+output+="$slave_output_docker"
 output+="${dockermysql} -uroot -proot -h ${masterip} -e \"drop database cluster_test;\"\n\n"
 output+="##############################################\n"
 echo -e '\x1B[1;36m'"${output}"
