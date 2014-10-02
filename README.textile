@@ -16,7 +16,7 @@ h3. Starting the master:
 
 @docker run --name my-master -d doug/mysql-master@
 
-The slaves will need to - -link to whatever the master's - -name is set to
+The slaves will need to @--link@ to whatever the master's - -name is set to
 
 The privileged user / password is by default root / root
 Override this by setting the env variables, $USERNAME and $PASSWORD:
@@ -27,7 +27,7 @@ h3. Starting the slaves:
 
 @docker run --name my-slave1 --link my-master:my-master -e "MYSQL_MASTER_HOST=my-master" -e "SERVER_ID=1" -d doug/mysql-slave@
 
-As well as using - -link to link to the master, the MYSQL_MASTER_HOST env variable needs to be set
+As well as using @--link@ to link to the master, the MYSQL_MASTER_HOST env variable needs to be set
 
 Each slave needs to be given a unique SERVER_ID
 
