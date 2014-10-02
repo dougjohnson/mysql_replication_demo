@@ -55,12 +55,21 @@ then
   exit 1
 fi
 
-dockermysql="docker run --rm --link master:master --link slave1:slave1 doug/mysql-client mysql"
+dockermysqlslave=""
+
+function dockermysqlslavelinks() {
+  dockermysqlslave="docker run --rm --link master:master "
+  for (( i=1; i<=${1}; i++ ))
+  do
+    dockermysqlslave+="--link slave$i:slave$i "
+  done
+  dockermysqlslave+="doug/mysql-client mysql"
+}
 
 function start_slave() {
   echo "starting slave ${1}"
   docker run -d -e SERVER_ID=${1} -e MYSQL_MASTER_HOST=master --link master:master --name slave${1} doug/mysql-slave
-  slave_output_docker+="${dockermysql} -uroot -proot -h slave1 -e \"select * from cluster_test.pets\"\n"
+  slave_output_docker+="${dockermysqlslave} -uroot -proot -h slave${1} -e \"select * from cluster_test.pets\"\n"
   return $?
 }
 
@@ -72,6 +81,7 @@ function start_master() {
 
 start_master
 
+dockermysqlslavelinks $num_slaves
 for (( i=1; i<=$num_slaves; i++ ))
 do
   start_slave $i
@@ -82,10 +92,10 @@ output+="##############################################\n"
 output+="\n"
 output+="Your replicating cluster is ready to go!\n"
 output+="Connect to it from within another container:\n"
-output+="${dockermysql} -uroot -proot -h master -e \"create database cluster_test;\"\n"
-output+="${dockermysql} -uroot -proot -h master -e \"create table cluster_test.pets(name varchar(25));\"\n"
-output+="${dockermysql} -uroot -proot -h master -e \"insert into cluster_test.pets values('fido');\"\n"
+output+="docker run --rm --link master:master doug/mysql-client mysql -uroot -proot -h master -e \"create database cluster_test;\"\n"
+output+="docker run --rm --link master:master doug/mysql-client mysql -uroot -proot -h master -e \"create table cluster_test.pets(name varchar(25));\"\n"
+output+="docker run --rm --link master:master doug/mysql-client mysql -uroot -proot -h master -e \"insert into cluster_test.pets values('fido');\"\n"
 output+="$slave_output_docker"
-output+="${dockermysql} -uroot -proot -h master -e \"drop database cluster_test;\"\n\n"
+output+="docker run --rm --link master:master doug/mysql-client mysql -uroot -proot -h master -e \"drop database cluster_test;\"\n\n"
 output+="##############################################\n"
 echo -e '\x1B[1;36m'"${output}"
