@@ -1,4 +1,4 @@
-# Replicating MySQL Cluster Demo
+h1. Replicating MySQL Cluster Demo
 
 This demo is a lightweight bash script to bring together two Docker Containers to create a replicating MySQL cluster for testing / development purposes.
 
@@ -12,11 +12,45 @@ The script will pull a master image and a slave image from the docker hub and wi
 
 Ideal for testing read-write splitting in your web application.
 
-# Requirements
+h2. Starting master / slave manually
+
+h3. Starting the master:
+
+```
+docker run --name my-master -d harbour.navyproject.com/mysql-master
+```
+
+the slaves will need to --link to whatever the master's --name is set to
+
+the privileged user / password is by default root / root
+override this by setting the env variables, $USERNAME and $PASSWORD:
+
+```
+docker run --name my-master -e "USERNAME=fuji" -e "PASSWORD=yama" -d harbour.navyproject.com/mysql-master
+```
+
+h3. Starting the slaves:
+
+```
+docker run --name my-slave1 --link my-master:my-master -e "MYSQL_MASTER_HOST=my-master" -e "SERVER_ID=1" -d harbour.navyproject.com/mysql-slave
+```
+
+as well as using --link to link to the master, the MYSQL_MASTER_HOST env variable needs to be set
+
+each slave needs to be given a unique SERVER_ID
+
+no need to snapshot a slave - masters can be snapshotted and new slaves will always catch up
+
+root / root can be overridden in the same way as for a master
+
+slaves have a default readonly user set who only has select privileges: readonly / readonly
+this username / password can be overridden by passing in the READONLY_USERNAME and READONLY_PASSWORD environment variables
+
+h2. Requirements
 
 * Docker
 * Internet
 
-# License
+h2. License
 
 MIT License

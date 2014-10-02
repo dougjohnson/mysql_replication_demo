@@ -1,0 +1,18 @@
+#!/bin/sh
+
+USERNAME=${USERNAME:-'root'}
+PASSWORD=${PASSWORD:-'root'}
+DATABASE=${DATABASE:-'*'}
+REMOTE=${REMOTE:-'%'}
+
+service mysqld start
+
+sleep 2
+
+mysql -e "GRANT ALL PRIVILEGES ON $DATABASE.* TO '$USERNAME'@'$REMOTE' IDENTIFIED BY '$PASSWORD'"
+mysql -e "GRANT REPLICATION SLAVE ON *.* TO 'replication'@'%' IDENTIFIED BY 'password'"
+mysql -e "flush privileges"
+
+service mysqld stop
+
+mysqld_safe --server-id=100 --log-bin=mysql-bin --log-slave-updates=1

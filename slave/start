@@ -1,0 +1,24 @@
+#!/bin/sh
+
+USERNAME=${USERNAME:-'root'}
+PASSWORD=${PASSWORD:-'root'}
+READONLY_USERNAME=${USERNAME:-'readonly'}
+READONLY_PASSWORD=${PASSWORD:-'readonly'}
+DATABASE=${DATABASE:-'*'}
+REMOTE=${REMOTE:-'%'}
+MYSQL_MASTER_HOST=${MYSQL_MASTER_HOST:-'mysql-master'}
+SERVER_ID=${SERVER_ID:-1}
+
+service mysqld start
+
+sleep 2
+
+mysql -e "GRANT ALL PRIVILEGES ON $DATABASE.* TO '$USERNAME'@'$REMOTE' IDENTIFIED BY '$PASSWORD'"
+mysql -e "GRANT SELECT ON $DATABASE.* TO '$READONLY_USERNAME'@'$REMOTE' IDENTIFIED BY '$READONLY_PASSWORD'"
+mysql -e "CHANGE MASTER TO master_host='$MYSQL_MASTER_HOST', master_port=3306, master_user='replication', master_password='password', master_log_file='mysql-bin.000001', master_log_pos=106;"
+mysql -e "start slave"
+mysql -e "flush privileges"
+
+service mysqld stop
+
+mysqld_safe --server-id=$SERVER_ID --log-bin=mysql-bin --log-slave-updates=1

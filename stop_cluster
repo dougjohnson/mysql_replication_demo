@@ -1,7 +1,5 @@
 #!/bin/bash -e
 
-master_port=3306
-
 trap "tput sgr0" EXIT
 
 function usage() {

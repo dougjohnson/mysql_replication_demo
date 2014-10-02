@@ -1,7 +1,5 @@
 #!/bin/bash -e
 
-master_port=3306
-
 trap "tput sgr0" EXIT
 
 function usage() {
@@ -57,50 +55,37 @@ then
   exit 1
 fi
 
-dockermysql="docker run --rm doug/mysql-client mysql"
+dockermysql="docker run --rm --link master:master --link slave1:slave1 doug/mysql-client mysql"
 
 function start_slave() {
-  echo "starting slave ${1} on port ${2}"
-  docker run -d -p ${2}:3306 --link master:master --name slave${1} doug/mysql-slave --server-id=${1}
-  slaveip=`docker inspect --format='{{.NetworkSettings.IPAddress}}' slave${1}`
-  slave_output_host+="mysql -uroot -proot -h 127.0.0.1 -P ${2} -e \"select * from cluster_test.pets\"\n"
-  slave_output_docker+="${dockermysql} -uroot -proot -h ${slaveip} -e \"select * from cluster_test.pets\"\n"
+  echo "starting slave ${1}"
+  docker run -d -e SERVER_ID=${1} -e MYSQL_MASTER_HOST=master --link master:master --name slave${1} doug/mysql-slave
+  slave_output_docker+="${dockermysql} -uroot -proot -h slave1 -e \"select * from cluster_test.pets\"\n"
   return $?
 }
 
 function start_master() {
-  echo "starting master on port $master_port"
-  docker run -d -p $master_port:3306 --name master doug/mysql-master
+  echo "starting master"
+  docker run -d --name master doug/mysql-master
   return $?
 }
 
 start_master
-masterip=`docker inspect --format='{{.NetworkSettings.IPAddress}}' master`
 
 for (( i=1; i<=$num_slaves; i++ ))
 do
-  let slave_port=$master_port+$i
-  start_slave $i $slave_port
+  start_slave $i
 done
 
 
 output+="##############################################\n"
 output+="\n"
 output+="Your replicating cluster is ready to go!\n"
-output+="Connect to it on 127.0.0.1 if you're running docker locally\n"
-output+="\n"
-output+="Issue the following commands to test it:\n"
-output+="\n"
-output+="mysql -uroot -proot -h 127.0.0.1 -P 3306 -e \"create database cluster_test;\"\n"
-output+="mysql -uroot -proot -h 127.0.0.1 -P 3306 -e \"create table cluster_test.pets(name varchar(25));\"\n"
-output+="mysql -uroot -proot -h 127.0.0.1 -P 3306 -e \"insert into cluster_test.pets values('fido');\"\n"
-output+="$slave_output_host"
-output+="mysql -uroot -proot -h 127.0.0.1 -P 3306 -e \"drop database cluster_test;\"\n\n"
-output+="Or connect to it from within another container:\n"
-output+="${dockermysql} -uroot -proot -h ${masterip} -e \"create database cluster_test;\"\n"
-output+="${dockermysql} -uroot -proot -h ${masterip} -e \"create table cluster_test.pets(name varchar(25));\"\n"
-output+="${dockermysql} -uroot -proot -h ${masterip} -e \"insert into cluster_test.pets values('fido');\"\n"
+output+="Connect to it from within another container:\n"
+output+="${dockermysql} -uroot -proot -h master -e \"create database cluster_test;\"\n"
+output+="${dockermysql} -uroot -proot -h master -e \"create table cluster_test.pets(name varchar(25));\"\n"
+output+="${dockermysql} -uroot -proot -h master -e \"insert into cluster_test.pets values('fido');\"\n"
 output+="$slave_output_docker"
-output+="${dockermysql} -uroot -proot -h ${masterip} -e \"drop database cluster_test;\"\n\n"
+output+="${dockermysql} -uroot -proot -h master -e \"drop database cluster_test;\"\n\n"
 output+="##############################################\n"
 echo -e '\x1B[1;36m'"${output}"
