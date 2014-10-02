@@ -16,7 +16,7 @@ h3. Starting the master:
 
 @docker run --name my-master -d doug/mysql-master@
 
-The slaves will need to @--link@ to whatever the master's - -name is set to
+The slaves will need to @--link@ to whatever the master's @--name@ is set to
 
 The privileged user / password is by default root / root
 Override this by setting the env variables, $USERNAME and $PASSWORD:
